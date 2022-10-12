@@ -1,8 +1,11 @@
 import random
 import sqlite3
+from collections import namedtuple
+
+Card = namedtuple('Card', ['id', 'number', 'pin', 'balance'], defaults=[None, None, None, 0])
 
 
-def create_database():
+def create_database() -> None:
     try:
         conn = sqlite3.connect("card.s3db")
         cursor = conn.cursor()
@@ -12,7 +15,7 @@ def create_database():
         print('Welcome. You have connected to the banking system! Select one option')
 
 
-def extract_data_query(query):
+def extract_data_query(query: str) -> list:
     conn = sqlite3.connect("card.s3db")
     cursor = conn.cursor()
     cursor.execute(query)
@@ -21,41 +24,27 @@ def extract_data_query(query):
     return result
 
 
-def extract_single_data_query(query, printing=True):
+def extract_single_data_query(query: str, printing=True):
     conn = sqlite3.connect("card.s3db")
     cursor = conn.cursor()
     cursor.execute(query)
     conn.commit()
     result = cursor.fetchone()
     if printing is True:
+        print(type(result))
         print(*result)
     else:
         return result
 
 
-def execute_query(query):
+def execute_query(query: str):
     conn = sqlite3.connect("card.s3db")
     cursor = conn.cursor()
     cursor.execute(query)
     conn.commit()
 
 
-def banking_system_menu(account_data=None):
-    if account_data is None:
-        create_database()
-        #account_data = extract_data_query('SELECT * FROM card')
-    while True:
-        user_input = validate_user_option()
-        if user_input == 1:
-            db_data_recording()
-        elif user_input == 2:
-            login_into_account()
-        else:
-            print('Bye!')
-            exit()
-
-
-def db_data_recording():
+def db_data_recording() -> None:
     card_number = generate_card_number()
     print('Your card number:\n', card_number, sep='')
     pin = generate_pin()
@@ -67,29 +56,28 @@ def db_data_recording():
 def login_into_account():
     login_card_num = input('Enter your card number:\n')
     login_pin = input('Enter your PIN:\n')
+    card = Card(login_card_num, login_pin)
     account_data = extract_data_query('SELECT * FROM card')
     for instance in account_data:
-        if instance[1] == login_card_num and instance[2] == login_pin:
+        if instance[1] == card.number and instance[2] == card.pin:
             print("You have successfully logged in!")
-            return logging_options(account_data, login_card_num)
+            return logging_options(account_data, card.number)
         continue
     print("Wrong card number or PIN!")
 
 
-def logging_options(account_data, card_number):
+def logging_options(account_data, card_number: str) -> None:
     logged_options = {'1': 'Balance', '2': 'Add income', '3': 'Do transfer', '4': 'Close account', '5': 'Log out', '0': "Exit"}
     for key in logged_options.keys():
         print(key + '', logged_options[key])
     logging_input_option = input()
-    if logging_input_option not in logged_options.keys():
-        print('Wrong option')
-    elif logging_input_option == '1':
+    if logging_input_option == '1':
         balance = extract_single_data_query(f"SELECT balance FROM card WHERE number={card_number}", printing=False)
         print("Your current balance is {0}".format(balance[0]))
     elif logging_input_option == '2':
         add_income(card_number)
     elif logging_input_option == '3':
-        do_transfer_money(card_number)
+        transfer_money(card_number)
     elif logging_input_option == '4':
         close_account(card_number)
         banking_system_menu()
@@ -116,7 +104,7 @@ def add_income(card_number):
         print('Enter correct income!')
 
 
-def do_transfer_money(user_card_number):
+def transfer_money(user_card_number: str) -> None:
     card_number = input("Transfer\nEnter card number:\n")
     data_base_cards, option = check_card_for_validity(user_card_number, card_number)
     if option == 1:
@@ -135,31 +123,31 @@ def do_transfer_money(user_card_number):
             print('Not enough money!')
 
 
-def close_account(card_number):
+def close_account(card_number: str) -> None:
     query = f'DELETE FROM card WHERE number={card_number}'
     execute_query(query)
 
 
-def validate_user_option():
+def validate_user_option() -> int:
     options = ["1. Create an account", "2. Log into account", "0. Exit"]
     print('\n'.join(options))
     try:
         user_input = int(input())
-        if user_input not in range(0, 3):
+        if user_input not in range(len(options)):
             raise ValueError
         return user_input
     except ValueError:
         print('Wrong option, select one option')
-        validate_user_option()
+        return validate_user_option()
 
 
-def generate_pin():
+def generate_pin() -> str:
     pin = ''.join(str(random.choice(range(0, 10))) for x in range(4))
     print('Your card PIN:')
     return pin
 
 
-def generate_card_number():
+def generate_card_number() -> str:
     issuer_id_number = '400000'
     customer_acc_number = ''.join(str(random.choice(range(0, 10))) for x in range(9))
     card_number = issuer_id_number + customer_acc_number
@@ -170,7 +158,7 @@ def generate_card_number():
     return final_card_number
 
 
-def get_check_sum_number(card_number_sum):
+def get_check_sum_number(card_number_sum: int) -> int:
     check_sum = 0
     while True:
         if (card_number_sum + check_sum) % 10 == 0:
@@ -179,7 +167,7 @@ def get_check_sum_number(card_number_sum):
     return check_sum
 
 
-def validate_card_number(card_number):
+def validate_card_number(card_number: str) -> int:
     summ = 0
     for ind, char in enumerate(card_number):
         if ind % 2 == 0:
@@ -192,7 +180,7 @@ def validate_card_number(card_number):
     return summ
 
 
-def check_card_for_validity(user_card_number, transfer_card_number):
+def check_card_for_validity(user_card_number: str, transfer_card_number: str) -> tuple[list, int]:
     check_sum = validate_card_number(transfer_card_number)
     data_base_cards = extract_data_query("SELECT number FROM card")
     if user_card_number == transfer_card_number:
@@ -209,4 +197,19 @@ def check_card_for_validity(user_card_number, transfer_card_number):
         return data_base_cards, 0
 
 
-banking_system_menu()
+def banking_system_menu(account_data=None) -> None:
+    if account_data is None:
+        create_database()
+    while True:
+        user_input = validate_user_option()
+        if user_input == 1:
+            db_data_recording()
+        elif user_input == 2:
+            login_into_account()
+        else:
+            print('Bye!')
+            exit()
+
+
+if __name__ == "__main__":
+    banking_system_menu()
